@@ -1,0 +1,214 @@
+/* ACSS Recipe Drawer — styles injected into the closed shadow root.
+   Shadow DOM isolates the drawer from ACSS resets and Builderius styles. */
+
+:host {
+  all: initial;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #1d2327;
+}
+
+#ard-host {
+  position: fixed;
+  z-index: 2147483647;
+  left: 16px;
+  bottom: 16px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+}
+
+#ard-tab {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  background: #1d2327;
+  color: #fff;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px;
+  cursor: move;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  letter-spacing: 0.2px;
+}
+
+#ard-tab:hover {
+  background: #3858e9;
+}
+
+#ard-panel {
+  display: none;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+#ard-panel.ard-open {
+  display: flex;
+}
+
+#ard-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f0f0f1;
+  border-bottom: 1px solid #dcdcde;
+  cursor: move;
+}
+
+#ard-panel header .ard-title {
+  font-weight: 700;
+}
+
+#ard-panel header .ard-actions-top {
+  display: flex;
+  gap: 6px;
+}
+
+.ard-btn {
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.ard-btn:hover {
+  border-color: #3858e9;
+  color: #3858e9;
+}
+
+.ard-btn.ard-primary {
+  background: #3858e9;
+  border-color: #3858e9;
+  color: #fff;
+}
+
+.ard-btn.ard-primary:hover {
+  background: #274ac6;
+}
+
+#ard-search-wrap {
+  position: relative;
+  padding: 10px 12px 4px;
+}
+
+#ard-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  outline: none;
+}
+
+#ard-input:focus {
+  border-color: #3858e9;
+  box-shadow: 0 0 0 1px #3858e9;
+}
+
+#ard-autocomplete {
+  display: none;
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 40px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+}
+
+#ard-autocomplete.ard-show {
+  display: block;
+}
+
+.ard-ac-row {
+  padding: 7px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ard-ac-row:last-child {
+  border-bottom: none;
+}
+
+.ard-ac-row.ard-active,
+.ard-ac-row:hover {
+  background: #f0f6ff;
+}
+
+.ard-ac-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ard-ac-badge {
+  background: #3858e9;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ard-ac-preview {
+  color: #646970;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#ard-output {
+  flex: 1 1 auto;
+  margin: 8px 12px;
+  padding: 8px 10px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 120px;
+  max-height: 360px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre;
+  overflow: auto;
+  background: #fff;
+}
+
+#ard-status {
+  padding: 6px 12px 10px;
+  color: #646970;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#ard-status .ard-status-text {
+  flex: 1 1 auto;
+}
+
+.ard-flash {
+  color: #00a32a;
+  font-weight: 700;
+}
