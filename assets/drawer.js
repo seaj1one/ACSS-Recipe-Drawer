@@ -26,6 +26,10 @@
 	var dragStartX = 0, dragStartY = 0;
 	var dragOriginLeft = 0, dragOriginTop = 0;
 	var STORAGE_KEY = 'ard-position';
+	var WIDTH_KEY = 'ard-width';
+	var WRAP_KEY = 'ard-wrap';
+	var MIN_WIDTH = 420;
+	var MAX_WIDTH = function () { return window.innerWidth - 32; };
 
 	var host = document.createElement('div');
 	host.id = 'acss-recipe-drawer-host';
@@ -95,6 +99,10 @@
 	statusText.className = 'ard-status-text';
 	statusText.textContent = '';
 	status.appendChild(statusText);
+	var wrapBtn = document.createElement('button');
+	wrapBtn.type = 'button';
+	wrapBtn.className = 'ard-btn';
+	wrapBtn.textContent = strings.wrap || 'Wrap';
 	var copyBtn = document.createElement('button');
 	copyBtn.type = 'button';
 	copyBtn.className = 'ard-btn ard-primary';
@@ -103,9 +111,15 @@
 	clearBtn.type = 'button';
 	clearBtn.className = 'ard-btn';
 	clearBtn.textContent = strings.clear || 'Clear';
+	status.appendChild(wrapBtn);
 	status.appendChild(clearBtn);
 	status.appendChild(copyBtn);
 	panel.appendChild(status);
+
+	// Right-edge resize handle for horizontal expand.
+	var resizeHandle = document.createElement('div');
+	resizeHandle.id = 'ard-resize';
+	panel.appendChild(resizeHandle);
 
 	document.body.appendChild(host);
 
@@ -485,6 +499,84 @@
 				setStatus(Object.keys(data).length + ' recipes (refreshed)');
 			}
 		});
+	});
+
+	// --- Word wrap toggle ---
+	function applyWrap(on) {
+		if (on) {
+			output.classList.add('ard-wrap');
+		} else {
+			output.classList.remove('ard-wrap');
+		}
+	}
+
+	function setWrapBtn(on) {
+		if (on) {
+			wrapBtn.classList.add('ard-active');
+		} else {
+			wrapBtn.classList.remove('ard-active');
+		}
+	}
+
+	function saveWrap(on) {
+		try { sessionStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch (e) {}
+	}
+
+	function loadWrap() {
+		try { return sessionStorage.getItem(WRAP_KEY) === '1'; } catch (e) { return false; }
+	}
+
+	var wrapped = loadWrap();
+	applyWrap(wrapped);
+	setWrapBtn(wrapped);
+
+	wrapBtn.addEventListener('click', function () {
+		wrapped = !wrapped;
+		applyWrap(wrapped);
+		setWrapBtn(wrapped);
+		saveWrap(wrapped);
+	});
+
+	// --- Horizontal resize (right-edge handle) ---
+	function applyWidth(w) {
+		root.style.width = w + 'px';
+	}
+
+	function saveWidth(w) {
+		try { sessionStorage.setItem(WIDTH_KEY, String(w)); } catch (e) {}
+	}
+
+	function loadWidth() {
+		try {
+			var raw = sessionStorage.getItem(WIDTH_KEY);
+			return raw ? parseInt(raw, 10) : null;
+		} catch (e) { return null; }
+	}
+
+	(function restoreWidth() {
+		var saved = loadWidth();
+		if (saved && saved >= MIN_WIDTH && saved <= MAX_WIDTH()) {
+			applyWidth(saved);
+		}
+	})();
+
+	resizeHandle.addEventListener('mousedown', function (e) {
+		e.preventDefault();
+		var startX = e.clientX;
+		var startW = root.getBoundingClientRect().width || MIN_WIDTH;
+		function move(ev) {
+			var nw = startW + (ev.clientX - startX);
+			if (nw < MIN_WIDTH) { nw = MIN_WIDTH; }
+			if (nw > MAX_WIDTH()) { nw = MAX_WIDTH(); }
+			applyWidth(nw);
+		}
+		function up() {
+			document.removeEventListener('mousemove', move);
+			document.removeEventListener('mouseup', up);
+			saveWidth(root.getBoundingClientRect().width || MIN_WIDTH);
+		}
+		document.addEventListener('mousemove', move);
+		document.addEventListener('mouseup', up);
 	});
 
 	tab.addEventListener('click', function (e) {

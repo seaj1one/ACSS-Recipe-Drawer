@@ -4,18 +4,22 @@
 :host {
   all: initial;
 
-  /* Builderius design tokens, with the existing palette as fallbacks. */
-  --ard-color-text: var(--color--base--950, #1d2327);
-  --ard-color-text-muted: var(--color--base--600, #646970);
-  --ard-color-primary: var(--color--primary--500, #3858e9);
-  --ard-color-primary-hover: var(--color--primary--600, #274ac6);
-  --ard-color-primary-subtle: var(--color--primary--50, #f0f6ff);
-  --ard-color-success: var(--color--success--600, #00a32a);
-  --ard-color-white: var(--color--base--0, #fff);
-  --ard-color-surface: var(--color--base--0, #fff);
-  --ard-color-surface-muted: var(--color--base--50, #f0f0f1);
-  --ard-color-border: var(--color--base--300, #c3c4c7);
-  --ard-color-border-subtle: var(--color--base--200, #dcdcde);
+  /* ACSS dashboard --e-* palette snapshot. The dashboard scopes these to
+     .acss-dashboard (unreachable in the Builderius canvas), so we snapshot
+     literal values here. --ard-color-white is the CONTRAST FOREGROUND on
+     light/primary backgrounds (tab text, primary button text) — it goes
+     dark, not light, or those elements become invisible on the dark scheme. */
+  --ard-color-text:           hsl(240, 7%, 89%);
+  --ard-color-text-muted:     hsla(240, 7%, 89%, 0.6);
+  --ard-color-primary:        oklch(85.19% 0.125 186.39);
+  --ard-color-primary-hover:  oklch(72% 0.125 186.39);
+  --ard-color-primary-subtle: oklch(85.19% 0.125 186.39 / 0.15);
+  --ard-color-success:        oklch(85.19% 0.125 186.39);
+  --ard-color-white:          hsl(240, 6%, 12%);
+  --ard-color-surface:        hsl(240, 5%, 16%);
+  --ard-color-surface-muted:  hsl(240, 4%, 22%);
+  --ard-color-border:         hsl(240, 4%, 22%);
+  --ard-color-border-subtle:  hsl(240, 3%, 30%);
 }
 
 *, *::before, *::after {
@@ -110,6 +114,19 @@
   background: var(--ard-color-primary-hover);
 }
 
+.ard-btn.ard-active {
+  background: var(--ard-color-primary-subtle);
+  border-color: var(--ard-color-primary);
+  color: var(--ard-color-primary);
+  font-weight: 700;
+}
+
+.ard-btn.ard-active:hover {
+  background: var(--ard-color-primary-subtle);
+  border-color: var(--ard-color-primary-hover);
+  color: var(--ard-color-primary-hover);
+}
+
 #ard-search-wrap {
   position: relative;
   padding: 10px 12px 4px;
@@ -121,6 +138,8 @@
   border: 1px solid var(--ard-color-border);
   border-radius: 4px;
   outline: none;
+  background: var(--ard-color-surface);
+  color: var(--ard-color-text);
 }
 
 #ard-input:focus {
@@ -206,6 +225,12 @@
   white-space: pre;
   overflow: auto;
   background: var(--ard-color-surface);
+  color: var(--ard-color-text);
+}
+
+#ard-output.ard-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 #ard-status {
@@ -224,4 +249,19 @@
 .ard-flash {
   color: var(--ard-color-success);
   font-weight: 700;
+}
+
+#ard-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 1;
+}
+
+#ard-resize:hover {
+  background: var(--ard-color-primary-subtle);
 }
