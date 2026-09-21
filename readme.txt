@@ -4,7 +4,7 @@ Tags: acss, automaticcss, builderius, recipes, css
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -48,6 +48,11 @@ The Clipboard API requires a secure context and can be blocked inside an iframe 
 No. This is a separate plugin. It depends only on ACSS's PHP API (`\Automatic_CSS\API::get_all_recipes()`), not on the bridge.
 
 == Changelog ==
+
+= 1.1.0 =
+* Inherit ACSS dashboard colour scheme in the drawer (Builderius colour variables).
+* Expand textarea horizontally with optional word wrap.
+* Add agent docs and prototype references.
 
 = 1.0.0 =
 * Initial release. Shadow-DOM drawer in the Builderius canvas, built-in + custom recipes, two-tier `%root%` unwrap, autocomplete with keyboard navigation, clipboard copy with fallback.
