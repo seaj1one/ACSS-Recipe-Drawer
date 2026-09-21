@@ -4,7 +4,7 @@ Tags: acss, automaticcss, builderius, recipes, css
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -48,6 +48,11 @@ The Clipboard API requires a secure context and can be blocked inside an iframe 
 No. This is a separate plugin. It depends only on ACSS's PHP API (`\Automatic_CSS\API::get_all_recipes()`), not on the bridge.
 
 == Changelog ==
+
+= 1.1.1 =
+* Add an output word-wrap toggle and persist its setting for the browser session.
+* Add a right-edge handle to expand the drawer horizontally and persist its width for the browser session.
+* Use the ACSS dashboard's dark palette with teal controls instead of the Builderius canvas palette.
 
 = 1.1.0 =
 * Inherit ACSS dashboard colour scheme in the drawer (Builderius colour variables).
