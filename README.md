@@ -9,7 +9,7 @@ Renders a shadow-DOM recipe drawer in the Builderius canvas that exposes ACSS bu
 | **Requires at least** | 5.8 |
 | **Tested up to** | 6.7 |
 | **Requires PHP** | 7.4 |
-| **Stable tag** | 1.0.0 |
+| **Stable tag** | 1.1.1 |
 | **License** | GPLv2 or later ([License URI](https://www.gnu.org/licenses/gpl-2.0.html)) |
 
 ## Description
@@ -23,6 +23,9 @@ ACSS Recipe Drawer is a standalone companion plugin for Builderius users who als
   * Any other arrangement (`%root% > *`, `:has(> %root%)`, `.target %root% a::after`, etc.) is converted to CSS-nesting syntax using `&`, ready to paste inside a selector in the CSS IDE.
   * `%root%` inside comments is left untouched.
 * **`?` syntax tolerance** — type `?primary-clr;` with a leading `?` and trailing `;` and it still resolves, matching ACSS's Bricks/Gutenberg muscle memory.
+* **Resizable output** — drag the drawer's right edge to expand it horizontally. The selected width is retained for the browser session.
+* **Word wrap** — use the **Wrap** control to wrap long recipe lines. The preference is retained for the browser session.
+* **ACSS dashboard palette** — the drawer uses ACSS's dark interface palette and teal controls, independent of the Builderius canvas theme.
 
 ### Context
 
@@ -50,6 +53,14 @@ The Clipboard API requires a secure context and can be blocked inside an iframe 
 No. This is a separate plugin. It depends only on ACSS's PHP API (`\Automatic_CSS\API::get_all_recipes()`), not on the bridge.
 
 ## Changelog
+
+### 1.1.1
+* Add a persisted word-wrap control for recipe output.
+* Add a persisted right-edge handle to resize the drawer horizontally.
+* Apply the ACSS dashboard dark palette with teal controls.
+
+### 1.1.0
+* Add the initial Builderius colour-variable and resize/wrap prototype work.
 
 ### 1.0.0
 * Initial release. Shadow-DOM drawer in the Builderius canvas, built-in + custom recipes, two-tier `%root%` unwrap, autocomplete with keyboard navigation, clipboard copy with fallback.
