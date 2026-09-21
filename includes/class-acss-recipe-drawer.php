@@ -132,6 +132,7 @@ class ACSS_Recipe_Drawer {
 					'placeholder' => __( 'Type a recipe name...', 'acss-recipe-drawer' ),
 					'copy'       => __( 'Copy', 'acss-recipe-drawer' ),
 					'clear'      => __( 'Clear', 'acss-recipe-drawer' ),
+					'wrap'       => __( 'Wrap', 'acss-recipe-drawer' ),
 					'copied'     => __( 'Copied!', 'acss-recipe-drawer' ),
 					'refresh'    => __( 'Refresh', 'acss-recipe-drawer' ),
 					'custom'     => __( 'custom', 'acss-recipe-drawer' ),

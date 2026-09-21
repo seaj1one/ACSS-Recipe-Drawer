@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — throwaway. Answers: "what should the resize + wrap interaction
+  look like?" Three structurally different variants of horizontal-expand +
+  word-wrap for the ACSS Recipe Drawer, switchable via ?variant=A|B|C and the
+  floating bottom bar. Double-click to run; no build step, no server.
+
+  Not production code. The validated winner gets folded into drawer.js/drawer.css;
+  this file lands on a throwaway branch.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACSS Recipe Drawer — resize + wrap prototype</title>
+<style>
+  body { margin: 0; background: #f0f0f1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #stage { position: fixed; inset: 0; }
+  .hint { position: fixed; top: 12px; left: 12px; font-size: 12px; color: #646970; background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 6px 10px; z-index: 10; max-width: 360px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="hint">Prototype — flip variants with the bottom bar or ←/→ keys. Each widens the drawer and handles word wrap differently. Drag the canvas to test.</div>
+<div id="stage"></div>
+
+<!-- Floating variant switcher (shared, not part of the drawer design). -->
+<div id="switcher" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#1d2327;color:#fff;border-radius:999px;padding:8px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:2147483647;font-size:13px;">
+  <button id="prev" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;">&larr;</button>
+  <span id="label" style="font-weight:600;min-width:180px;text-align:center;"></span>
+  <button id="next" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;">&rarr;</button>
+</div>
+
+<!-- Builderius theme injector: toggles fake --color--* tokens on <html> so the
+     shadow-DOM drawer inherits them, proving the variable chain works. -->
+<div id="theme-bar" style="position:fixed;top:12px;right:12px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:6px 10px;z-index:10;font-size:12px;">
+  <label style="color:#646970;font-weight:600;">Builderius theme:</label>
+  <button id="theme-default" class="theme-btn" style="border:1px solid #c3c4c7;border-radius:4px;padding:3px 8px;cursor:pointer;background:#fff;">Default</button>
+  <button id="theme-dark" class="theme-btn" style="border:1px solid #c3c4c7;border-radius:4px;padding:3px 8px;cursor:pointer;background:#fff;">Dark</button>
+  <button id="theme-warm" class="theme-btn" style="border:1px solid #c3c4c7;border-radius:4px;padding:3px 8px;cursor:pointer;background:#fff;">Warm</button>
+</div>
+
+<style id="builderius-theme"></style>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Sample recipe data (mimics the AJAX response shape) ---
+  var RECIPES = {
+    'btn-primary': {
+      css: '/* btn-primary — a long single-line recipe to show wrap vs scroll */\n%root% {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: var(--space-xs) var(--space-md);\n  background: var(--color-primary);\n  color: #fff;\n  border-radius: var(--radius-md);\n  font-weight: 600;\n  line-height: 1;\n  transition: background 0.15s ease;\n}\n%root%:hover {\n  background: var(--color-primary-hover);\n}',
+      source: 'builtin'
+    },
+    'card-shadow': {
+      css: '%root% {\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);\n  border-radius: var(--radius-lg);\n  overflow: hidden;\n}',
+      source: 'builtin'
+    },
+    'my-custom-thing': {
+      css: '/* custom recipe */\n.target %root% a::after {\n  content: "";\n  display: block;\n  width: 8px;\n  height: 8px;\n  background: currentColor;\n}',
+      source: 'custom'
+    }
+  };
+
+  // --- Shared drawer CSS (mirrors drawer.css, with variant hooks) ---
+  // Uses the same --ard-color-* token scheme as production drawer.css, so it
+  // inherits Builderius's --color--* variables when present (with fallbacks).
+  var DRAWER_CSS = `
+:host {
+  all: initial;
+  --ard-color-text: var(--color--base--950, #1d2327);
+  --ard-color-text-muted: var(--color--base--600, #646970);
+  --ard-color-primary: var(--color--primary--500, #3858e9);
+  --ard-color-primary-hover: var(--color--primary--600, #274ac6);
+  --ard-color-primary-subtle: var(--color--primary--50, #f0f6ff);
+  --ard-color-success: var(--color--success--600, #00a32a);
+  --ard-color-white: var(--color--base--0, #fff);
+  --ard-color-surface: var(--color--base--0, #fff);
+  --ard-color-surface-muted: var(--color--base--50, #f0f0f1);
+  --ard-color-border: var(--color--base--300, #c3c4c7);
+  --ard-color-border-subtle: var(--color--base--200, #dcdcde);
+}
+*, *::before, *::after { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: var(--ard-color-text); }
+#ard-host { position: fixed; z-index: 2147483646; left: 16px; bottom: 16px; width: 420px; max-width: calc(100vw - 32px); }
+#ard-tab { position: absolute; left: 0; bottom: 0; background: var(--ard-color-text); color: var(--ard-color-white); border: none; border-radius: 8px 8px 0 0; padding: 8px 14px; cursor: move; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.25); letter-spacing: 0.2px; }
+#ard-tab:hover { background: var(--ard-color-primary); }
+#ard-panel { display: none; flex-direction: column; background: var(--ard-color-surface); border: 1px solid var(--ard-color-border-subtle); border-radius: 10px 10px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.18); overflow: hidden; position: relative; }
+#ard-panel.ard-open { display: flex; background: var(--ard-color-surface); border: 1px solid var(--ard-color-border-subtle); }
+#ard-panel header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--ard-color-surface-muted); border-bottom: 1px solid var(--ard-color-border-subtle); cursor: move; position: relative; z-index: 2; }
+#ard-panel header .ard-title { font-weight: 700; }
+#ard-panel header .ard-actions-top { display: flex; gap: 6px; align-items: center; }
+.ard-btn { background: var(--ard-color-surface); border: 1px solid var(--ard-color-border); border-radius: 4px; padding: 4px 10px; cursor: pointer; line-height: 1.4; color: var(--ard-color-text); }
+.ard-btn:hover { border-color: var(--ard-color-primary); color: var(--ard-color-primary); }
+.ard-btn:active { background: var(--ard-color-surface-muted); }
+.ard-btn:focus-visible { outline: 2px solid var(--ard-color-primary); outline-offset: 1px; }
+.ard-btn.ard-active { background: var(--ard-color-primary-subtle); border-color: var(--ard-color-primary); color: var(--ard-color-primary); font-weight: 700; }
+.ard-btn.ard-active:hover { background: var(--ard-color-primary-subtle); border-color: var(--ard-color-primary-hover); color: var(--ard-color-primary-hover); }
+.ard-btn.ard-primary { background: var(--ard-color-primary); border-color: var(--ard-color-primary); color: var(--ard-color-white); }
+.ard-btn.ard-primary:hover { background: var(--ard-color-primary-hover); border-color: var(--ard-color-primary-hover); color: var(--ard-color-white); }
+.ard-btn.ard-primary:active { background: var(--ard-color-primary-hover); border-color: var(--ard-color-primary-hover); }
+.ard-btn.ard-primary:focus-visible { outline: 2px solid var(--ard-color-primary); outline-offset: 1px; }
+#ard-search-wrap { position: relative; padding: 10px 12px 4px; }
+#ard-input { width: 100%; padding: 7px 10px; border: 1px solid var(--ard-color-border); border-radius: 4px; outline: none; }
+#ard-input:focus { border-color: var(--ard-color-primary); box-shadow: 0 0 0 1px var(--ard-color-primary); }
+#ard-output { flex: 1 1 auto; margin: 8px 12px; padding: 8px 10px; border: 1px solid var(--ard-color-border); border-radius: 4px; resize: vertical; min-height: 120px; max-height: 360px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre; overflow: auto; background: var(--ard-color-surface); }
+#ard-output.ard-wrap { white-space: pre-wrap; }
+#ard-status { padding: 6px 12px 10px; color: var(--ard-color-text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#ard-status .ard-status-text { flex: 1 1 auto; }
+.ard-flash { color: var(--ard-color-success); font-weight: 700; }
+
+/* Variant A: right-edge resize handle */
+#ard-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: ew-resize; background: transparent; z-index: 1; }
+#ard-resize:hover { background: var(--ard-color-primary-subtle); }
+
+/* Variant B: bottom-right corner grip */
+#ard-corner { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 3; }
+#ard-corner::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 10px; height: 10px; border-right: 2px solid var(--ard-color-border); border-bottom: 2px solid var(--ard-color-border); }
+#ard-corner:hover::after { border-color: var(--ard-color-primary); }
+
+/* Variant C: width preset buttons live in header .ard-actions-top (no extra element) */
+.ard-width-badge { font-size: 10px; font-weight: 700; color: var(--ard-color-text-muted); margin-right: 2px; }
+`;
+
+  var MIN_WIDTH = 420;
+  var MAX_WIDTH = function () { return window.innerWidth - 32; };
+  var AUTO_WRAP_THRESHOLD = 600; // variant B
+
+  // --- Build the drawer once; variants swap behaviour, not structure ---
+  var stage = document.getElementById('stage');
+  var host = document.createElement('div');
+  var shadow = host.attachShadow({ mode: 'open' });
+  var style = document.createElement('style');
+  style.textContent = DRAWER_CSS;
+  shadow.appendChild(style);
+  var root = document.createElement('div');
+  root.id = 'ard-host';
+  shadow.appendChild(root);
+
+  var tab = document.createElement('button');
+  tab.id = 'ard-tab';
+  tab.type = 'button';
+  tab.textContent = 'ACSS Recipes';
+  root.appendChild(tab);
+
+  var panel = document.createElement('div');
+  panel.id = 'ard-panel';
+  root.appendChild(panel);
+
+  var header = document.createElement('header');
+  var title = document.createElement('span');
+  title.className = 'ard-title';
+  title.textContent = 'ACSS Recipes';
+  var actionsTop = document.createElement('span');
+  actionsTop.className = 'ard-actions-top';
+  var refreshBtn = document.createElement('button');
+  refreshBtn.type = 'button';
+  refreshBtn.className = 'ard-btn';
+  refreshBtn.textContent = 'Refresh';
+  actionsTop.appendChild(refreshBtn);
+  header.appendChild(title);
+  header.appendChild(actionsTop);
+  panel.appendChild(header);
+
+  var searchWrap = document.createElement('div');
+  searchWrap.id = 'ard-search-wrap';
+  var input = document.createElement('input');
+  input.id = 'ard-input';
+  input.type = 'text';
+  input.setAttribute('placeholder', 'Type a recipe name...');
+  searchWrap.appendChild(input);
+  panel.appendChild(searchWrap);
+
+  var output = document.createElement('textarea');
+  output.id = 'ard-output';
+  output.setAttribute('readonly', 'readonly');
+  output.setAttribute('placeholder', 'No recipes found.');
+  panel.appendChild(output);
+
+  var status = document.createElement('div');
+  status.id = 'ard-status';
+  var statusText = document.createElement('span');
+  statusText.className = 'ard-status-text';
+  statusText.textContent = Object.keys(RECIPES).length + ' recipes';
+  status.appendChild(statusText);
+  var copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'ard-btn ard-primary';
+  copyBtn.textContent = 'Copy';
+  var clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'ard-btn';
+  clearBtn.textContent = 'Clear';
+  status.appendChild(clearBtn);
+  status.appendChild(copyBtn);
+  panel.appendChild(status);
+
+  // Variant-specific elements, created lazily per variant.
+  var resizeHandle = null;   // variant A
+  var cornerGrip = null;     // variant B
+  var widthPresets = null;   // variant C
+  var wrapBtn = null;        // variant A
+
+  stage.appendChild(host);
+  panel.classList.add('ard-open'); // open by default for prototyping
+  // Preload a long recipe so wrap/scroll is visible immediately.
+  output.value = RECIPES['btn-primary'].css;
+  input.value = 'btn-primary';
+
+  // --- Shared helpers ---
+  function applyWidth(w) { root.style.width = w + 'px'; }
+  function applyWrap(on) {
+    if (on) output.classList.add('ard-wrap'); else output.classList.remove('ard-wrap');
+  }
+  function setWrapBtn(on) {
+    if (!wrapBtn) return;
+    if (on) wrapBtn.classList.add('ard-active'); else wrapBtn.classList.remove('ard-active');
+  }
+
+  // --- Drag to move (tab + header are drag handles) ---
+  var DRAG_THRESHOLD = 5;
+  function startDrag(e) {
+    if (e.target === refreshBtn) return; // refresh clicks, not drags
+    var sx = e.clientX, sy = e.clientY;
+    var rect = root.getBoundingClientRect();
+    var ox = rect.left, oy = rect.top;
+    var moved = false;
+    function move(ev) {
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) moved = true;
+      if (!moved) return;
+      ev.preventDefault();
+      var nl = ox + dx, nt = oy + dy;
+      var r = root.getBoundingClientRect();
+      var maxL = window.innerWidth - 40, maxT = window.innerHeight - 40;
+      if (nl < 0) nl = 0; if (nl > maxL) nl = maxL;
+      if (nt < 0) nt = 0; if (nt > maxT) nt = maxT;
+      root.style.left = nl + 'px';
+      root.style.top = nt + 'px';
+      root.style.bottom = 'auto';
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+  tab.addEventListener('mousedown', startDrag);
+  header.addEventListener('mousedown', startDrag);
+
+  function clearVariantElements() {
+    [resizeHandle, cornerGrip, widthPresets, wrapBtn].forEach(function (el) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    resizeHandle = cornerGrip = widthPresets = wrapBtn = null;
+    // reset styles touched by variants
+    root.style.width = '';
+    output.classList.remove('ard-wrap');
+    output.style.minHeight = '';
+    output.style.maxHeight = '';
+  }
+
+  // --- Variant A: edge handle + explicit Wrap toggle ---
+  function mountVariantA() {
+    resizeHandle = document.createElement('div');
+    resizeHandle.id = 'ard-resize';
+    panel.appendChild(resizeHandle);
+
+    wrapBtn = document.createElement('button');
+    wrapBtn.type = 'button';
+    wrapBtn.className = 'ard-btn';
+    wrapBtn.textContent = 'Wrap';
+    status.insertBefore(wrapBtn, clearBtn);
+
+    var wrapped = false;
+    function setWrap(on) { wrapped = on; applyWrap(on); setWrapBtn(on); }
+    setWrap(false);
+
+    resizeHandle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      var startX = e.clientX;
+      var startW = root.getBoundingClientRect().width || MIN_WIDTH;
+      function move(ev) {
+        var nw = startW + (ev.clientX - startX);
+        if (nw < MIN_WIDTH) nw = MIN_WIDTH;
+        if (nw > MAX_WIDTH()) nw = MAX_WIDTH();
+        applyWidth(nw);
+      }
+      function up() {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+
+    wrapBtn.addEventListener('click', function () { setWrap(!wrapped); });
+  }
+
+  // --- Variant B: corner grip + auto-wrap past threshold ---
+  function mountVariantB() {
+    cornerGrip = document.createElement('div');
+    cornerGrip.id = 'ard-corner';
+    panel.appendChild(cornerGrip);
+
+    function syncWrap() {
+      var w = root.getBoundingClientRect().width || MIN_WIDTH;
+      applyWrap(w > AUTO_WRAP_THRESHOLD);
+    }
+    syncWrap();
+
+    cornerGrip.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      var startX = e.clientX, startY = e.clientY;
+      var startW = root.getBoundingClientRect().width || MIN_WIDTH;
+      var startH = root.getBoundingClientRect().height || 300;
+      function move(ev) {
+        var nw = startW + (ev.clientX - startX);
+        var nh = startH + (ev.clientY - startY);
+        if (nw < MIN_WIDTH) nw = MIN_WIDTH;
+        if (nw > MAX_WIDTH()) nw = MAX_WIDTH();
+        if (nh < 200) nh = 200;
+        if (nh > window.innerHeight - 32) nh = window.innerHeight - 32;
+        applyWidth(nw);
+        root.style.height = nh + 'px';
+        output.style.maxHeight = (nh - 160) + 'px';
+        syncWrap();
+      }
+      function up() {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  }
+
+  // --- Variant C: width presets in header + always-wrap ---
+  function mountVariantC() {
+    applyWrap(true); // always on
+
+    widthPresets = document.createElement('span');
+    widthPresets.className = 'ard-width-badge';
+    widthPresets.textContent = 'WIDTH';
+    var sizes = [['S', 420], ['M', 600], ['L', 800]];
+    var btns = [];
+    sizes.forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ard-btn';
+      b.textContent = s[0];
+      b.dataset.w = s[1];
+      b.addEventListener('click', function () {
+        var w = parseInt(b.dataset.w, 10);
+        if (w > MAX_WIDTH()) w = MAX_WIDTH();
+        applyWidth(w);
+        btns.forEach(function (x) { x.classList.remove('ard-active'); });
+        b.classList.add('ard-active');
+      });
+      btns.push(b);
+      widthPresets.appendChild(b);
+    });
+    actionsTop.insertBefore(widthPresets, refreshBtn);
+    btns[0].classList.add('ard-active');
+  }
+
+  var MOUNTERS = { A: mountVariantA, B: mountVariantB, C: mountVariantC };
+  var NAMES = {
+    A: 'A — Edge handle + Wrap toggle',
+    B: 'B — Corner grip + auto-wrap past 600px',
+    C: 'C — Width presets (S/M/L) + always-wrap'
+  };
+
+  function mount(variant) {
+    clearVariantElements();
+    (MOUNTERS[variant] || MOUNTERS.A)();
+  }
+
+  // --- Switcher ---
+  var params = new URLSearchParams(location.search);
+  var order = ['A', 'B', 'C'];
+  var current = order.indexOf(params.get('variant')) >= 0 ? params.get('variant') : 'A';
+  var labelEl = document.getElementById('label');
+  var prevBtn = document.getElementById('prev');
+  var nextBtn = document.getElementById('next');
+
+  function setVariant(v, push) {
+    current = v;
+    labelEl.textContent = NAMES[v];
+    var u = new URL(location.href);
+    u.searchParams.set('variant', v);
+    if (push) history.pushState(null, '', u); else history.replaceState(null, '', u);
+    mount(v);
+  }
+
+  function cycle(dir) {
+    var i = order.indexOf(current);
+    i = (i + dir + order.length) % order.length;
+    setVariant(order[i], true);
+  }
+
+  prevBtn.addEventListener('click', function () { cycle(-1); });
+  nextBtn.addEventListener('click', function () { cycle(1); });
+  window.addEventListener('popstate', function () {
+    var v = new URLSearchParams(location.search).get('variant');
+    if (order.indexOf(v) >= 0) setVariant(v, false);
+  });
+  window.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    if (e.key === 'ArrowLeft') cycle(-1);
+    else if (e.key === 'ArrowRight') cycle(1);
+  });
+
+  // Copy/clear wiring (shared, minimal)
+  copyBtn.addEventListener('click', function () {
+    if (output.value) { output.select(); try { document.execCommand('copy'); } catch (e) {} }
+  });
+  clearBtn.addEventListener('click', function () {
+    output.value = ''; input.value = ''; statusText.textContent = '';
+  });
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase();
+    var keys = Object.keys(RECIPES).filter(function (k) { return !q || k.indexOf(q) >= 0; });
+    if (keys.length && RECIPES[keys[0]]) output.value = RECIPES[keys[0]].css;
+  });
+
+  setVariant(current, false);
+
+  // --- Builderius theme injector (prototype-only) ---
+  // Toggles fake --color--* tokens on <html>. The shadow-DOM drawer's :host
+  // reads inherited custom properties from the outer document, so this proves
+  // the variable chain: change a Builderius token here, the drawer follows.
+  var THEMES = {
+    'default': '', // no override — drawer uses its own fallbacks
+    'dark': `:root {
+      --color--base--0: #1e1e1e; --color--base--50: #2a2a2a; --color--base--200: #3a3a3a;
+      --color--base--300: #4a4a4a; --color--base--600: #a0a0a0; --color--base--950: #f0f0f0;
+      --color--primary--500: #4a9eff; --color--primary--600: #3a8eef; --color--primary--50: rgba(74,158,255,0.15);
+      --color--success--600: #4ade80;
+    }`,
+    'warm': `:root {
+      --color--base--0: #fdf8f3; --color--base--50: #f5ebe0; --color--base--200: #e0d0c0;
+      --color--base--300: #c9a99a; --color--base--600: #8a6a5a; --color--base--950: #3a2a20;
+      --color--primary--500: #c2410c; --color--primary--600: #9a3412; --color--primary--50: #fef3e8;
+      --color--success--600: #65a30d;
+    }`
+  };
+  var themeStyle = document.getElementById('builderius-theme');
+  var themeBtns = document.querySelectorAll('.theme-btn');
+  function setTheme(name) {
+    themeStyle.textContent = THEMES[name] || '';
+    themeBtns.forEach(function (b) { b.style.fontWeight = b.id === 'theme-' + name ? '700' : '400'; b.style.borderColor = b.id === 'theme-' + name ? '#3858e9' : '#c3c4c7'; });
+  }
+  document.getElementById('theme-default').addEventListener('click', function () { setTheme('default'); });
+  document.getElementById('theme-dark').addEventListener('click', function () { setTheme('dark'); });
+  document.getElementById('theme-warm').addEventListener('click', function () { setTheme('warm'); });
+  setTheme('default');
+})();
+</script>
+</body>
+</html>
