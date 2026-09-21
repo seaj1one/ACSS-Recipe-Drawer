@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — throwaway. Answers: "what should the ACSS-coloured drawer look
+  like?" Three structurally different colour schemes, switchable via
+  ?variant=A|B|C and the floating bottom bar. Double-click to run; no build
+  step, no server.
+
+  Not production code. The validated winner gets folded into drawer.css; this
+  file lands on a throwaway branch.
+
+  Context: ACSS's dashboard UI uses a --e-* editor palette (dark surfaces, light
+  text, teal primary) scoped to .acss-dashboard — unreachable in the Builderius
+  canvas. So the drawer must snapshot literal values. These three variants test
+  different readings of "match ACSS's dashboard."
+
+  Key inversion: --ard-color-white is the CONTRAST FOREGROUND used on light/
+  primary backgrounds (tab text, primary button text). In the dark scheme it
+  must map to a DARK colour, not light, or those elements become invisible.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACSS Recipe Drawer — colour scheme prototype</title>
+<style>
+  body { margin: 0; background: #f0f0f1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #stage { position: fixed; inset: 0; }
+  .hint { position: fixed; top: 12px; left: 12px; font-size: 12px; color: #646970; background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 6px 10px; z-index: 10; max-width: 420px; line-height: 1.5; }
+  #mapping { position: fixed; top: 12px; right: 12px; font-size: 11px; font-family: "SF Mono", Menlo, Consolas, monospace; background: #1d2327; color: #e0e0e0; border-radius: 6px; padding: 10px 12px; z-index: 10; max-width: 360px; max-height: 70vh; overflow: auto; line-height: 1.6; white-space: pre; }
+  #mapping .map-title { font-weight: 700; color: #fff; margin-bottom: 4px; }
+  #mapping .map-row { color: #a0a0a0; }
+  #mapping .map-val { color: #6ad6c0; }
+</style>
+</head>
+<body>
+<div class="hint">Prototype — flip colour schemes with the bottom bar or ←/→ keys. Each variant rewrites the drawer's --ard-color-* token block. The panel on the right shows the active mapping.</div>
+<div id="stage"></div>
+<div id="mapping"></div>
+
+<!-- Floating variant switcher (shared, not part of the drawer design). -->
+<div id="switcher" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#1d2327;color:#fff;border-radius:999px;padding:8px 14px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:2147483647;font-size:13px;">
+  <button id="prev" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;">&larr;</button>
+  <span id="label" style="font-weight:600;min-width:240px;text-align:center;"></span>
+  <button id="next" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;">&rarr;</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Sample recipe data (mimics the AJAX response shape) ---
+  var RECIPES = {
+    'btn-primary': {
+      css: '/* btn-primary — a long single-line recipe to show wrap vs scroll */\n%root% {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: var(--space-xs) var(--space-md);\n  background: var(--color-primary);\n  color: #fff;\n  border-radius: var(--radius-md);\n  font-weight: 600;\n  line-height: 1;\n  transition: background 0.15s ease;\n}\n%root%:hover {\n  background: var(--color-primary-hover);\n}',
+      source: 'builtin'
+    },
+    'card-shadow': {
+      css: '%root% {\n  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);\n  border-radius: var(--radius-lg);\n  overflow: hidden;\n}',
+      source: 'builtin'
+    },
+    'my-custom-thing': {
+      css: '/* custom recipe */\n.target %root% a::after {\n  content: "";\n  display: block;\n  width: 8px;\n  height: 8px;\n  background: currentColor;\n}',
+      source: 'custom'
+    }
+  };
+
+  // --- Colour scheme variants ---
+  // Each rewrites the :host --ard-color-* block. --ard-color-white is the
+  // CONTRAST FOREGROUND on light/primary backgrounds, so it goes dark.
+  var COLOUR_SCHEMES = {
+    A: {
+      name: 'A — Pure --e-* snapshot (dark bluer, teal primary, teal success)',
+      tokens: {
+        '--ard-color-text':           'hsl(240, 7%, 89%)',
+        '--ard-color-text-muted':     'hsla(240, 7%, 89%, 0.6)',
+        '--ard-color-primary':        'oklch(85.19% 0.125 186.39)',
+        '--ard-color-primary-hover':  'oklch(72% 0.125 186.39)',
+        '--ard-color-primary-subtle': 'oklch(85.19% 0.125 186.39 / 0.15)',
+        '--ard-color-success':        'oklch(85.19% 0.125 186.39)',
+        '--ard-color-white':          'hsl(240, 6%, 12%)',
+        '--ard-color-surface':        'hsl(240, 5%, 16%)',
+        '--ard-color-surface-muted':  'hsl(240, 4%, 22%)',
+        '--ard-color-border':         'hsl(240, 4%, 22%)',
+        '--ard-color-border-subtle':  'hsl(240, 3%, 30%)'
+      },
+      sources: {
+        '--ard-color-text':           '--e-light',
+        '--ard-color-text-muted':     '--e-foreground-color-muted',
+        '--ard-color-primary':        '--e-primary',
+        '--ard-color-primary-hover':  '--e-primary-dark',
+        '--ard-color-primary-subtle': '--e-primary-ultra-light',
+        '--ard-color-success':        '--e-primary (teal, Q6.3=a)',
+        '--ard-color-white':          '--e-base-dark (contrast on light bg)',
+        '--ard-color-surface':        '--e-base',
+        '--ard-color-surface-muted':  '--e-base-light',
+        '--ard-color-border':         '--e-base-light',
+        '--ard-color-border-subtle':  '--e-base-ultra-light'
+      }
+    },
+    B: {
+      name: 'B — Icon-matched slate (hsl(193,12%,20%) family, teal primary)',
+      tokens: {
+        '--ard-color-text':           'hsl(193, 10%, 85%)',
+        '--ard-color-text-muted':     'hsla(193, 10%, 85%, 0.6)',
+        '--ard-color-primary':        'oklch(85.19% 0.125 186.39)',
+        '--ard-color-primary-hover':  'oklch(72% 0.125 186.39)',
+        '--ard-color-primary-subtle': 'oklch(85.19% 0.125 186.39 / 0.15)',
+        '--ard-color-success':        'oklch(85.19% 0.125 186.39)',
+        '--ard-color-white':          'hsl(193, 12%, 8%)',
+        '--ard-color-surface':        'hsl(193, 12%, 20%)',
+        '--ard-color-surface-muted':  'hsl(193, 10%, 26%)',
+        '--ard-color-border':         'hsl(193, 10%, 26%)',
+        '--ard-color-border-subtle':  'hsl(193, 8%, 32%)'
+      },
+      sources: {
+        '--ard-color-text':           'lighter slate (icon hue)',
+        '--ard-color-text-muted':     'muted slate',
+        '--ard-color-primary':        '--e-primary (teal)',
+        '--ard-color-primary-hover':  '--e-primary-dark',
+        '--ard-color-primary-subtle': '--e-primary-ultra-light',
+        '--ard-color-success':        '--e-primary (teal, Q6.3=a)',
+        '--ard-color-white':          'dark slate (contrast on light bg)',
+        '--ard-color-surface':        'icon bg hsl(193,12%,20%)',
+        '--ard-color-surface-muted':  'lighter slate',
+        '--ard-color-border':         'lighter slate',
+        '--ard-color-border-subtle':  'lightest slate'
+      }
+    },
+    C: {
+      name: 'C — Higher-contrast dark + green success (Q6.3=b)',
+      tokens: {
+        '--ard-color-text':           'hsl(240, 10%, 95%)',
+        '--ard-color-text-muted':     'hsla(240, 10%, 95%, 0.6)',
+        '--ard-color-primary':        'oklch(85.19% 0.125 186.39)',
+        '--ard-color-primary-hover':  'oklch(72% 0.125 186.39)',
+        '--ard-color-primary-subtle': 'oklch(85.19% 0.125 186.39 / 0.15)',
+        '--ard-color-success':        '#3fae7a',
+        '--ard-color-white':          'hsl(240, 6%, 8%)',
+        '--ard-color-surface':        'hsl(240, 6%, 12%)',
+        '--ard-color-surface-muted':  'hsl(240, 5%, 18%)',
+        '--ard-color-border':         'hsl(240, 5%, 18%)',
+        '--ard-color-border-subtle':  'hsl(240, 4%, 26%)'
+      },
+      sources: {
+        '--ard-color-text':           'brighter --e-light',
+        '--ard-color-text-muted':     'muted bright',
+        '--ard-color-primary':        '--e-primary (teal)',
+        '--ard-color-primary-hover':  '--e-primary-dark',
+        '--ard-color-primary-subtle': '--e-primary-ultra-light',
+        '--ard-color-success':        '#3fae7a (green, Q6.3=b)',
+        '--ard-color-white':          '--e-base-dark (contrast on light bg)',
+        '--ard-color-surface':        '--e-base-dark (darker)',
+        '--ard-color-surface-muted':  'between base-dark and base',
+        '--ard-color-border':         'muted dark',
+        '--ard-color-border-subtle':  'lighter dark'
+      }
+    }
+  };
+
+  // --- Drawer CSS (mirrors drawer.css, but the --ard-color-* block is
+  //     injected separately so variants can swap it) ---
+  var DRAWER_CSS_BASE = `
+*, *::before, *::after { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: var(--ard-color-text); }
+#ard-host { position: fixed; z-index: 2147483646; left: 16px; bottom: 16px; width: 420px; max-width: calc(100vw - 32px); }
+#ard-tab { position: absolute; left: 0; bottom: 0; background: var(--ard-color-text); color: var(--ard-color-white); border: none; border-radius: 8px 8px 0 0; padding: 8px 14px; cursor: move; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.25); letter-spacing: 0.2px; }
+#ard-tab:hover { background: var(--ard-color-primary); }
+#ard-panel { display: none; flex-direction: column; background: var(--ard-color-surface); border: 1px solid var(--ard-color-border-subtle); border-radius: 10px 10px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.18); overflow: hidden; position: relative; }
+#ard-panel.ard-open { display: flex; background: var(--ard-color-surface); border: 1px solid var(--ard-color-border-subtle); }
+#ard-panel header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--ard-color-surface-muted); border-bottom: 1px solid var(--ard-color-border-subtle); cursor: move; position: relative; z-index: 2; }
+#ard-panel header .ard-title { font-weight: 700; }
+#ard-panel header .ard-actions-top { display: flex; gap: 6px; align-items: center; }
+.ard-btn { background: var(--ard-color-surface); border: 1px solid var(--ard-color-border); border-radius: 4px; padding: 4px 10px; cursor: pointer; line-height: 1.4; color: var(--ard-color-text); }
+.ard-btn:hover { border-color: var(--ard-color-primary); color: var(--ard-color-primary); }
+.ard-btn:active { background: var(--ard-color-surface-muted); }
+.ard-btn:focus-visible { outline: 2px solid var(--ard-color-primary); outline-offset: 1px; }
+.ard-btn.ard-active { background: var(--ard-color-primary-subtle); border-color: var(--ard-color-primary); color: var(--ard-color-primary); font-weight: 700; }
+.ard-btn.ard-active:hover { background: var(--ard-color-primary-subtle); border-color: var(--ard-color-primary-hover); color: var(--ard-color-primary-hover); }
+.ard-btn.ard-primary { background: var(--ard-color-primary); border-color: var(--ard-color-primary); color: var(--ard-color-white); }
+.ard-btn.ard-primary:hover { background: var(--ard-color-primary-hover); border-color: var(--ard-color-primary-hover); color: var(--ard-color-white); }
+.ard-btn.ard-primary:active { background: var(--ard-color-primary-hover); border-color: var(--ard-color-primary-hover); }
+.ard-btn.ard-primary:focus-visible { outline: 2px solid var(--ard-color-primary); outline-offset: 1px; }
+#ard-search-wrap { position: relative; padding: 10px 12px 4px; }
+#ard-input { width: 100%; padding: 7px 10px; border: 1px solid var(--ard-color-border); border-radius: 4px; outline: none; background: var(--ard-color-surface); color: var(--ard-color-text); }
+#ard-input:focus { border-color: var(--ard-color-primary); box-shadow: 0 0 0 1px var(--ard-color-primary); }
+#ard-output { flex: 1 1 auto; margin: 8px 12px; padding: 8px 10px; border: 1px solid var(--ard-color-border); border-radius: 4px; resize: vertical; min-height: 120px; max-height: 360px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre; overflow: auto; background: var(--ard-color-surface); color: var(--ard-color-text); }
+#ard-output.ard-wrap { white-space: pre-wrap; }
+#ard-status { padding: 6px 12px 10px; color: var(--ard-color-text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#ard-status .ard-status-text { flex: 1 1 auto; }
+.ard-flash { color: var(--ard-color-success); font-weight: 700; }
+#ard-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: ew-resize; background: transparent; z-index: 1; }
+#ard-resize:hover { background: var(--ard-color-primary-subtle); }
+.ard-width-badge { font-size: 10px; font-weight: 700; color: var(--ard-color-text-muted); margin-right: 2px; }
+`;
+
+  function buildHostBlock(scheme) {
+    var lines = [':host { all: initial;'];
+    Object.keys(scheme.tokens).forEach(function (k) {
+      lines.push('  ' + k + ': ' + scheme.tokens[k] + ';');
+    });
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  // --- Build the drawer ---
+  var stage = document.getElementById('stage');
+  var host = document.createElement('div');
+  var shadow = host.attachShadow({ mode: 'open' });
+
+  // Two style elements: base CSS (static) + colour block (swappable)
+  var colorStyle = document.createElement('style');
+  shadow.appendChild(colorStyle);
+  var baseStyle = document.createElement('style');
+  baseStyle.textContent = DRAWER_CSS_BASE;
+  shadow.appendChild(baseStyle);
+
+  var root = document.createElement('div');
+  root.id = 'ard-host';
+  shadow.appendChild(root);
+
+  var tab = document.createElement('button');
+  tab.id = 'ard-tab';
+  tab.type = 'button';
+  tab.textContent = 'ACSS Recipes';
+  root.appendChild(tab);
+
+  var panel = document.createElement('div');
+  panel.id = 'ard-panel';
+  root.appendChild(panel);
+
+  var header = document.createElement('header');
+  var title = document.createElement('span');
+  title.className = 'ard-title';
+  title.textContent = 'ACSS Recipes';
+  var actionsTop = document.createElement('span');
+  actionsTop.className = 'ard-actions-top';
+  var refreshBtn = document.createElement('button');
+  refreshBtn.type = 'button';
+  refreshBtn.className = 'ard-btn';
+  refreshBtn.textContent = 'Refresh';
+  actionsTop.appendChild(refreshBtn);
+  header.appendChild(title);
+  header.appendChild(actionsTop);
+  panel.appendChild(header);
+
+  var searchWrap = document.createElement('div');
+  searchWrap.id = 'ard-search-wrap';
+  var input = document.createElement('input');
+  input.id = 'ard-input';
+  input.type = 'text';
+  input.setAttribute('placeholder', 'Type a recipe name...');
+  searchWrap.appendChild(input);
+  panel.appendChild(searchWrap);
+
+  var output = document.createElement('textarea');
+  output.id = 'ard-output';
+  output.setAttribute('readonly', 'readonly');
+  output.setAttribute('placeholder', 'No recipes found.');
+  panel.appendChild(output);
+
+  var status = document.createElement('div');
+  status.id = 'ard-status';
+  var statusText = document.createElement('span');
+  statusText.className = 'ard-status-text';
+  statusText.textContent = Object.keys(RECIPES).length + ' recipes';
+  var copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'ard-btn ard-primary';
+  copyBtn.textContent = 'Copy';
+  var clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'ard-btn';
+  clearBtn.textContent = 'Clear';
+  var wrapBtn = document.createElement('button');
+  wrapBtn.type = 'button';
+  wrapBtn.className = 'ard-btn';
+  wrapBtn.textContent = 'Wrap';
+  status.appendChild(statusText);
+  status.appendChild(clearBtn);
+  status.insertBefore(wrapBtn, clearBtn);
+  status.appendChild(copyBtn);
+  panel.appendChild(status);
+
+  // Resize handle (issue #2 addition)
+  var resizeHandle = document.createElement('div');
+  resizeHandle.id = 'ard-resize';
+  panel.appendChild(resizeHandle);
+
+  stage.appendChild(host);
+  panel.classList.add('ard-open');
+  output.value = RECIPES['btn-primary'].css;
+  input.value = 'btn-primary';
+
+  // --- Wrap toggle (issue #2 addition) ---
+  var wrapped = false;
+  function setWrap(on) {
+    wrapped = on;
+    if (on) output.classList.add('ard-wrap'); else output.classList.remove('ard-wrap');
+    if (on) wrapBtn.classList.add('ard-active'); else wrapBtn.classList.remove('ard-active');
+  }
+  setWrap(false);
+  wrapBtn.addEventListener('click', function () { setWrap(!wrapped); });
+
+  // --- Resize handle (issue #2 addition) ---
+  var MIN_WIDTH = 420;
+  var MAX_WIDTH = function () { return window.innerWidth - 32; };
+  resizeHandle.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    var startX = e.clientX;
+    var startW = root.getBoundingClientRect().width || MIN_WIDTH;
+    function move(ev) {
+      var nw = startW + (ev.clientX - startX);
+      if (nw < MIN_WIDTH) nw = MIN_WIDTH;
+      if (nw > MAX_WIDTH()) nw = MAX_WIDTH();
+      root.style.width = nw + 'px';
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+
+  // --- Drag to move (tab + header are drag handles) ---
+  var DRAG_THRESHOLD = 5;
+  function startDrag(e) {
+    if (e.target === refreshBtn || e.target === wrapBtn || e.target === copyBtn || e.target === clearBtn) return;
+    var sx = e.clientX, sy = e.clientY;
+    var rect = root.getBoundingClientRect();
+    var ox = rect.left, oy = rect.top;
+    var moved = false;
+    function move(ev) {
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) moved = true;
+      if (!moved) return;
+      ev.preventDefault();
+      var nl = ox + dx, nt = oy + dy;
+      var maxL = window.innerWidth - 40, maxT = window.innerHeight - 40;
+      if (nl < 0) nl = 0; if (nl > maxL) nl = maxL;
+      if (nt < 0) nt = 0; if (nt > maxT) nt = maxT;
+      root.style.left = nl + 'px';
+      root.style.top = nt + 'px';
+      root.style.bottom = 'auto';
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+  tab.addEventListener('mousedown', startDrag);
+  header.addEventListener('mousedown', startDrag);
+
+  // --- Copy/clear wiring (with success flash to test --ard-color-success) ---
+  copyBtn.addEventListener('click', function () {
+    if (output.value) {
+      output.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      statusText.textContent = 'Copied!';
+      statusText.classList.add('ard-flash');
+      setTimeout(function () {
+        statusText.classList.remove('ard-flash');
+        statusText.textContent = Object.keys(RECIPES).length + ' recipes';
+      }, 1200);
+    }
+  });
+  clearBtn.addEventListener('click', function () {
+    output.value = ''; input.value = ''; statusText.textContent = '';
+  });
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase();
+    var keys = Object.keys(RECIPES).filter(function (k) { return !q || k.indexOf(q) >= 0; });
+    if (keys.length && RECIPES[keys[0]]) output.value = RECIPES[keys[0]].css;
+  });
+
+  // --- Variant switching ---
+  function applyScheme(key) {
+    var scheme = COLOUR_SCHEMES[key];
+    colorStyle.textContent = buildHostBlock(scheme);
+    // Render the mapping table
+    var html = '<div class="map-title">' + scheme.name + '</div>';
+    Object.keys(scheme.tokens).forEach(function (k) {
+      html += '<div class="map-row">' + k + '</div>';
+      html += '<div class="map-val">  ' + scheme.sources[k] + ' &rarr; ' + scheme.tokens[k] + '</div>';
+    });
+    document.getElementById('mapping').innerHTML = html;
+  }
+
+  var params = new URLSearchParams(location.search);
+  var order = ['A', 'B', 'C'];
+  var current = order.indexOf(params.get('variant')) >= 0 ? params.get('variant') : 'A';
+  var labelEl = document.getElementById('label');
+  var prevBtn = document.getElementById('prev');
+  var nextBtn = document.getElementById('next');
+
+  function setVariant(v, push) {
+    current = v;
+    labelEl.textContent = COLOUR_SCHEMES[v].name;
+    var u = new URL(location.href);
+    u.searchParams.set('variant', v);
+    if (push) history.pushState(null, '', u); else history.replaceState(null, '', u);
+    applyScheme(v);
+  }
+
+  function cycle(dir) {
+    var i = order.indexOf(current);
+    i = (i + dir + order.length) % order.length;
+    setVariant(order[i], true);
+  }
+
+  prevBtn.addEventListener('click', function () { cycle(-1); });
+  nextBtn.addEventListener('click', function () { cycle(1); });
+  window.addEventListener('popstate', function () {
+    var v = new URLSearchParams(location.search).get('variant');
+    if (order.indexOf(v) >= 0) setVariant(v, false);
+  });
+  window.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    if (e.key === 'ArrowLeft') cycle(-1);
+    else if (e.key === 'ArrowRight') cycle(1);
+  });
+
+  setVariant(current, false);
+})();
+</script>
+</body>
+</html>
